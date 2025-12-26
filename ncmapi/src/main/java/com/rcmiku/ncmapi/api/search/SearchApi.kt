@@ -1,5 +1,8 @@
 package com.rcmiku.ncmapi.api.search
 
+import com.rcmiku.ncmapi.model.PlaylistTerminalSearchResponse
+import com.rcmiku.ncmapi.model.SearchData
+import com.rcmiku.ncmapi.model.SearchResources
 import com.rcmiku.ncmapi.model.SearchResponse
 import com.rcmiku.ncmapi.model.SearchSuggestKeywordResponse
 import com.rcmiku.ncmapi.utils.HttpManager
@@ -35,7 +38,30 @@ object SearchApi {
                 data = data,
                 crypto = if (searchType == SearchType.Song || searchType == SearchType.Playlist) HttpManager.CryptoType.EAPI else HttpManager.CryptoType.WEAPI
             )
-            json.decodeFromString(SearchResponse.serializer(), body)
+            when (searchType) {
+                SearchType.Playlist -> {
+                    val raw = json.decodeFromString(PlaylistTerminalSearchResponse.serializer(), body)
+                    val resources = raw.data.resources.map { p ->
+                        SearchResources(
+                            resourceType = "playlist",
+                            resourceId = p.id.toString(),
+                            playlist = p
+                        )
+                    }
+                    SearchResponse(
+                        code = raw.code,
+                        message = raw.message,
+                        data = SearchData(
+                            resources = resources,
+                            more = raw.data.more,
+                            totalCount = raw.data.totalCount,
+                            moreText = raw.data.moreText
+                        )
+                    )
+                }
+
+                else -> json.decodeFromString(SearchResponse.serializer(), body)
+            }
         }
     }
     

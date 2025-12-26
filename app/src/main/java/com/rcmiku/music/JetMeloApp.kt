@@ -15,6 +15,7 @@ import com.rcmiku.music.playback.PlayerController
 import com.rcmiku.music.utils.SongListUtil
 import com.rcmiku.music.utils.UserAgentUtil
 import com.rcmiku.music.utils.dataStore
+import com.rcmiku.music.viewModel.LyricTypeStore
 import com.rcmiku.ncmapi.utils.CookieProvider
 import com.rcmiku.ncmapi.utils.FileProvider
 import com.rcmiku.ncmapi.utils.UserAgentProvider
@@ -37,6 +38,7 @@ class JetMeloApp : Application(), SingletonImageLoader.Factory {
         FileProvider.init(cacheDir.resolve("ncm"))
         SongListUtil.init(filesDir.resolve("playlist"))
         UserAgentProvider.init(UserAgentUtil.DEFAULT_USER_AGENT)
+        LyricTypeStore.init(this)
         GlobalScope.launch {
             UserAgentProvider.init(UserAgentUtil.DEFAULT_USER_AGENT)
             dataStore.data

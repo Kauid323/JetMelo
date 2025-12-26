@@ -23,8 +23,6 @@ class LyricViewModel @Inject constructor() : ViewModel() {
     fun fetchLyric(musicId: Long) {
         viewModelScope.launch {
             _lyric.value = PlayerApi.songLyric(musicId).getOrNull()
-            _lyricType.value = LyricType.LYRIC
-            LyricTypeStore.set(LyricType.LYRIC)
         }
     }
 

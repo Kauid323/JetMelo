@@ -190,6 +190,21 @@ data class SearchResponse(
 )
 
 @Serializable
+data class PlaylistTerminalSearchResponse(
+    val code: Int = 200,
+    val message: String? = null,
+    val data: PlaylistTerminalSearchData = PlaylistTerminalSearchData()
+)
+
+@Serializable
+data class PlaylistTerminalSearchData(
+    val resources: List<Playlist> = emptyList(),
+    val more: Boolean = false,
+    val totalCount: Int = 0,
+    val moreText: String? = null
+)
+
+@Serializable
 data class SearchData(
     val resources: List<SearchResources> = emptyList(),
     val more: Boolean = false,
