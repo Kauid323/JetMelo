@@ -205,7 +205,7 @@ object AccountApi {
      suspend fun userPlaylistV1(userId: Long, trackIds: List<Long>): Result<com.rcmiku.ncmapi.model.UserPlaylistV1Response> {
           return runCatching {
               val body = HttpManager.request(
-                  url = "/api/user/playlist",
+                  url = "/weapi/user/playlist",
                   data = mapOf(
                       "uid" to userId.toString(),
                       "limit" to "1000",

@@ -92,7 +92,7 @@ object HttpManager {
             }
         }.getOrDefault(true)
 
-        val logMaxLen = if (fullDump) 20000 else 6000
+        val logMaxLen = if (fullDump) Int.MAX_VALUE else 50000
 
         val headers = mutableMapOf<String, String>()
         val defaultUa = UserAgentProvider.get().let { current ->
@@ -214,12 +214,13 @@ object HttpManager {
         }
         headers["Cookie"] = cookieHeader.toString()
 
-        // For EAPI, the transport path is typically /eapi/... while the signature uses the original /api/... path.
-        // Captures commonly show: url=/api/xxx and form body contains params (EAPI). Server expects /eapi/xxx endpoint.
-        val transportPath = if (crypto == CryptoType.EAPI && url.startsWith("/api/")) {
-            "/eapi/" + url.removePrefix("/api/")
-        } else {
-            url
+        // Match api-enhanced-main request.js behavior:
+        // - WEAPI: /api/xxx is transported as /weapi/xxx
+        // - EAPI:  /api/xxx is transported as /eapi/xxx (signature still uses original /api/xxx)
+        val transportPath = when {
+            crypto == CryptoType.WEAPI && url.startsWith("/api/") -> "/weapi/" + url.removePrefix("/api/")
+            crypto == CryptoType.EAPI && url.startsWith("/api/") -> "/eapi/" + url.removePrefix("/api/")
+            else -> url
         }
 
         val finalUrl = if (url.startsWith("http")) {
@@ -440,8 +441,7 @@ object HttpManager {
     private fun decodeBodyForLog(raw: String, contentEncoding: String?, maxLen: Int): String {
         // Sometimes Ktor returns a string containing raw gzip bytes (not transparently decompressed).
         // We try to detect and decompress for readable Logcat output.
-        val trunc = if (raw.length > maxLen) raw.take(maxLen) + "...<truncated>" else raw
-        return trunc
+        return if (raw.length > maxLen) raw.take(maxLen) + "...<truncated>" else raw
     }
 
     private fun gunzipToString(bytes: ByteArray, charset: Charset = Charsets.UTF_8): String {

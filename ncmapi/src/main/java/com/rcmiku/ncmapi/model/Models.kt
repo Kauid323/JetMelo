@@ -228,8 +228,13 @@ fun SearchResources.toAlbumList(): Album? = album
 fun SearchResources.toPlaylist(): Playlist? = playlist
 
 fun SearchResources.toSearchArtist(): SearchArtist? = artist?.let { a ->
+    val resolvedId = if (a.id != 0L) {
+        a.id
+    } else {
+        resourceId.toLongOrNull() ?: 0L
+    }
     SearchArtist(
-        id = a.id,
+        id = resolvedId,
         name = a.name ?: "",
         picUrl = a.picUrl,
         alias = a.alias,
@@ -253,6 +258,122 @@ data class UserPlaylistData(
 )
 
 @Serializable
+data class ArtistVideoResponse(
+    val code: Int,
+    val message: String? = null,
+    val data: ArtistVideoData? = null
+)
+
+@Serializable
+data class ArtistVideoData(
+    val records: List<ArtistVideoRecord> = emptyList(),
+    val page: ArtistVideoPage? = null
+)
+
+@Serializable
+data class ArtistVideoPage(
+    val size: Int = 0,
+    val cursor: String? = null,
+    val more: Boolean = false
+)
+
+@Serializable
+data class ArtistVideoRecord(
+    val id: String,
+    val type: Int = 0,
+    val position: Int? = null,
+    val resource: ArtistVideoResource? = null
+)
+
+@Serializable
+data class ArtistVideoResource(
+    val mlogBaseData: MlogBaseData? = null,
+    val mlogExtVO: MlogExtVO? = null,
+    val status: Int? = null,
+    val shareUrl: String? = null
+)
+
+@Serializable
+data class MlogBaseData(
+    val id: String,
+    val userId: Long? = null,
+    val type: Int? = null,
+    val text: String? = null,
+    val desc: String? = null,
+    val pubTime: Long? = null,
+    val coverUrl: String? = null,
+    val duration: Long? = null,
+    val threadId: String? = null,
+    val video: MlogVideoInfo? = null,
+    val videos: List<MlogVideo> = emptyList()
+)
+
+@Serializable
+data class MlogVideoInfo(
+    val videoKey: String? = null,
+    val duration: Long? = null,
+    val coverUrl: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val urlInfo: MlogVideoUrlInfo? = null,
+    val urlInfos: List<MlogVideoUrlInfo> = emptyList()
+)
+
+@Serializable
+data class MlogVideoUrlInfo(
+    val id: String? = null,
+    val url: String? = null,
+    val size: Long? = null,
+    val r: Int? = null,
+    val validityTime: Int? = null,
+    val resolution: Int? = null
+)
+
+@Serializable
+data class MlogVideo(
+    val tag: String? = null,
+    val url: String? = null,
+    val duration: Double? = null,
+    val size: Long? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val container: String? = null
+)
+
+@Serializable
+data class MlogExtVO(
+    val likedCount: Long? = null,
+    val commentCount: Long? = null,
+    val playCount: Long? = null,
+    val shareCount: Long? = null,
+    val liked: Boolean? = null,
+    val artistName: String? = null,
+    val artists: List<MlogArtist> = emptyList()
+)
+
+@Serializable
+data class MlogArtist(
+    val id: Long,
+    val name: String? = null,
+    val img1v1Url: String? = null
+)
+
+@Serializable
+data class MvUrlResponse(
+    val code: Int,
+    val data: MvUrlData? = null
+)
+
+@Serializable
+data class MvUrlData(
+    val id: Long? = null,
+    val url: String? = null,
+    val r: Int? = null,
+    val size: Long? = null,
+    val md5: String? = null
+)
+
+@Serializable
 data class UserPlaylistResponse(
     val data: UserPlaylistData = UserPlaylistData(),
     val code: Int = 200,
@@ -269,6 +390,12 @@ data class AlbumDetailResponse(
 data class AlbumInfoResponse(
     val album: Album,
     val songs: List<Song>,
+    val isSub: Boolean = false
+)
+
+@Serializable
+data class AlbumDetailDynamicResponse(
+    val code: Int = 200,
     val isSub: Boolean = false
 )
 
@@ -293,6 +420,19 @@ data class ArtistProfile(
 data class ArtistTopSong(
     val songs: List<Song>,
     val more: Boolean
+)
+
+@Serializable
+data class ArtistDescResponse(
+    val code: Int = 200,
+    val briefDesc: String? = null,
+    val introduction: List<ArtistIntroductionItem> = emptyList()
+)
+
+@Serializable
+data class ArtistIntroductionItem(
+    val ti: String? = null,
+    val txt: String? = null
 )
 
 @Serializable

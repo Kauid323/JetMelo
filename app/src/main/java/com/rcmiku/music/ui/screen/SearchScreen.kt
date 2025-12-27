@@ -235,7 +235,9 @@ fun SearchScreen(
                             searchResults[index]?.let { resource ->
                                 resource.toSearchArtist()?.let {
                                     ArtistListItem(artist = it, modifier = Modifier.clickable {
-                                        navController.navigate(ArtistNav(artistId = it.id))
+                                        if (it.id > 0L) {
+                                            navController.navigate(ArtistNav(artistId = it.id))
+                                        }
                                     })
                                 }
                             }

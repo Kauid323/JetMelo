@@ -375,25 +375,28 @@ fun SongMenuBottomSheet(
 
                 item {
                     Spacer(Modifier.height(12.dp))
-                }
             }
         }
     }
 
-    song?.let {
-        ArtistBottomSheet(
-            currentSong = it,
-            onClick = { artist ->
+song?.let {
+    ArtistBottomSheet(
+        currentSong = it,
+        onClick = { artist ->
+            if (artist.id > 0L) {
                 navController.navigate(ArtistNav(artistId = artist.id))
-            }, onDismiss = {
-                openArtistBottomSheet = false
-            },
-            openBottomSheet = openArtistBottomSheet,
-            onAlbumClick = { album ->
-                navController.navigate(AlbumNav(albumId = album.id))
-            })
-        SongListBottomSheet(song = it, onDismiss = {
-            openSongListBottomSheet = false
-        }, openBottomSheet = openSongListBottomSheet)
-    }
+            }
+        }, onDismiss = {
+            openArtistBottomSheet = false
+        },
+        openBottomSheet = openArtistBottomSheet,
+        onAlbumClick = { album ->
+            navController.navigate(AlbumNav(albumId = album.id))
+        })
+    SongListBottomSheet(song = it, onDismiss = {
+        openSongListBottomSheet = false
+    }, openBottomSheet = openSongListBottomSheet)
+}
+
+}
 }

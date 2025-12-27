@@ -1,7 +1,12 @@
 package com.rcmiku.music.ui.screen
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -46,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -60,21 +67,32 @@ import com.rcmiku.music.ui.components.NavigationTitle
 import com.rcmiku.music.ui.components.SongListItem
 import com.rcmiku.music.ui.components.SongMenuBottomSheet
 import com.rcmiku.music.ui.navigation.AlbumNav
+import com.rcmiku.music.ui.navigation.MvPlayerNav
 import com.rcmiku.music.viewModel.ArtistScreenViewModel
 import com.rcmiku.ncmapi.model.Song
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun ArtistScreen(
     navController: NavHostController,
-    artistScreenViewModel: ArtistScreenViewModel = hiltViewModel()
+    artistScreenViewModel: ArtistScreenViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope,
+    animatedContentScope: AnimatedContentScope
 ) {
     val artistHeadInfoState by artistScreenViewModel.artistHeadInfo.collectAsState()
     val artistTopSongState by artistScreenViewModel.artistTopSong.collectAsState()
+    val artistDescState by artistScreenViewModel.artistDesc.collectAsState()
     val artistAlbumList = artistScreenViewModel.artistAlbumList.collectAsLazyPagingItems()
+    val artistMvList = artistScreenViewModel.artistMvList.collectAsLazyPagingItems()
     val listState = rememberLazyListState()
     val showPlaylistTitle by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     var state by rememberSaveable { mutableIntStateOf(1) }
+
+    LaunchedEffect(state) {
+        if (state == 3) {
+            artistMvList.refresh()
+        }
+    }
     val mediaController = LocalPlayerController.current.controller
     val playerState = LocalPlayerState.current
     val isPlaying = playerState?.isPlaying == true
@@ -85,10 +103,12 @@ fun ArtistScreen(
     val titles = listOf(
         stringResource(R.string.home),
         stringResource(R.string.song),
-        stringResource(R.string.album)
+        stringResource(R.string.album),
+        stringResource(R.string.mv)
     )
 
-    LazyColumn(state = listState) {
+    with(sharedTransitionScope) {
+        LazyColumn(state = listState) {
         item {
             Box(
                 modifier = Modifier.fillMaxWidth(),
@@ -145,7 +165,9 @@ fun ArtistScreen(
                         title = stringResource(R.string.artist_info),
                         modifier = Modifier.animateItem()
                     )
-                    artistHeadInfoState?.data?.artist?.briefDesc?.trimIndent()?.let {
+                    val descText = (artistDescState?.briefDesc ?: artistHeadInfoState?.data?.artist?.briefDesc)
+                        ?.trimIndent()
+                    descText?.let {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -207,10 +229,114 @@ fun ArtistScreen(
                     }
                 }
             }
+
+            3 -> {
+                items(artistMvList.itemCount) { index ->
+                    val record = artistMvList[index]
+                    val base = record?.resource?.mlogBaseData
+                    val ext = record?.resource?.mlogExtVO
+                    val coverUrl = base?.coverUrl
+                    val title = base?.text ?: base?.desc ?: ""
+                    val author = ext?.artistName
+                        ?: ext?.artists?.firstOrNull()?.name
+                        ?: ""
+
+                    fun normalizeVideoUrl(raw: String?): String? {
+                        if (raw.isNullOrBlank()) return null
+                        if (raw.startsWith("http")) return raw
+                        return "https://music.163.com/" + raw.trimStart('/')
+                    }
+
+                    fun parseMvId(): Long {
+                        val threadId = base?.threadId
+                        if (!threadId.isNullOrBlank()) {
+                            // e.g. R_MV_5_14679928
+                            val last = threadId.split("_").lastOrNull()
+                            last?.toLongOrNull()?.let { return it }
+                        }
+                        return base?.id?.toLongOrNull() ?: 0L
+                    }
+
+                    val bestFromVideoInfo = base?.video?.urlInfos
+                        ?.filter { !it.url.isNullOrBlank() }
+                        ?.maxByOrNull { it.r ?: 0 }
+                        ?.url
+                        ?: base?.video?.urlInfo?.url
+
+                    val bestFromVideos = base?.videos
+                        ?.firstOrNull { !it.url.isNullOrBlank() }
+                        ?.url
+
+                    val videoUrl = normalizeVideoUrl(bestFromVideoInfo ?: bestFromVideos)
+                    val sharedKey = record?.id ?: ""
+                    val mvId = parseMvId()
+
+                    if (record != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    navController.navigate(
+                                        MvPlayerNav(
+                                            mvId = mvId,
+                                            videoUrl = "",
+                                            sharedKey = sharedKey,
+                                            title = title,
+                                            author = author,
+                                            coverUrl = coverUrl ?: ""
+                                        )
+                                    )
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = coverUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(MaterialTheme.shapes.small)
+                                    .sharedElement(
+                                        state = sharedTransitionScope.rememberSharedContentState(
+                                            key = "mv_cover_" + sharedKey
+                                        ),
+                                        animatedVisibilityScope = animatedContentScope,
+                                        boundsTransform = AlbumArtBoundsTransform,
+                                    )
+                            )
+
+                            Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+                                Text(
+                                    text = title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.sharedElement(
+                                        state = sharedTransitionScope.rememberSharedContentState(
+                                            key = "mv_title_" + sharedKey
+                                        ),
+                                        animatedVisibilityScope = animatedContentScope,
+                                        boundsTransform = AlbumArtBoundsTransform,
+                                    )
+                                )
+                                Text(
+                                    text = author,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        item {
-            Spacer(Modifier.navigationBarsPadding())
+            item {
+                Spacer(Modifier.navigationBarsPadding())
+            }
         }
     }
 

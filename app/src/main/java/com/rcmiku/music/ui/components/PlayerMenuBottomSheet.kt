@@ -1,6 +1,14 @@
 package com.rcmiku.music.ui.components
 
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -21,9 +29,12 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -31,15 +42,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.rcmiku.music.LocalPlayerState
 import com.rcmiku.music.R
+import com.rcmiku.music.ui.icons.Cloud
 import com.rcmiku.music.ui.icons.Comment
 import com.rcmiku.music.ui.icons.SongListAdd
 import com.rcmiku.music.ui.icons.Timelapse
 import com.rcmiku.music.ui.icons.Timer
 import com.rcmiku.music.viewModel.LyricType
 import com.rcmiku.music.viewModel.LyricTypeStore
+import com.rcmiku.ncmapi.api.player.PlayerApi
 import com.rcmiku.ncmapi.model.Song
+import kotlinx.coroutines.launch
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -55,10 +70,37 @@ fun PlayerMenuBottomSheet(
     val playerState = LocalPlayerState.current
     val isSleepTimerSet = playerState?.isSleepTimerSet == true
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var cancelSleepTimer by rememberSaveable { mutableStateOf(false) }
     var openSongListBottomSheet by rememberSaveable { mutableStateOf(false) }
     var openCommentBottomSheet by rememberSaveable { mutableStateOf(false) }
     var openLyricTypeBottomSheet by rememberSaveable { mutableStateOf(false) }
+    var lastDownloadId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    val downloadCompleteReceiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                if (id != -1L && id == lastDownloadId) {
+                    Toast.makeText(ctx, "下载完成", Toast.LENGTH_SHORT).show()
+                    lastDownloadId = null
+                }
+            }
+        }
+    }
+
+    DisposableEffect(openBottomSheet) {
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(downloadCompleteReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(downloadCompleteReceiver, filter)
+        }
+        onDispose {
+            runCatching { context.unregisterReceiver(downloadCompleteReceiver) }
+        }
+    }
 
     LaunchedEffect(openBottomSheet) {
         if (openBottomSheet) {
@@ -206,6 +248,79 @@ fun PlayerMenuBottomSheet(
                             )
                             Text(
                                 text = stringResource(R.string.add_to_songList),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp)
+                                .clickable {
+                                    val songId = currentSong?.id
+                                    if (songId == null || songId <= 0L) {
+                                        Toast.makeText(context, "没有可下载的歌曲", Toast.LENGTH_SHORT).show()
+                                        return@clickable
+                                    }
+
+                                    coroutineScope.launch {
+                                        val result = PlayerApi.songPlayUrlV1(id = songId.toString())
+                                        val resp = result.getOrNull()
+                                        val url = resp?.data
+                                            ?.firstOrNull { !it.url.isNullOrBlank() }
+                                            ?.url
+
+                                        if (url.isNullOrBlank()) {
+                                            Toast.makeText(context, "获取下载链接失败", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+
+                                        val songName = currentSong.name ?: songId.toString()
+                                        val safeName = songName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                                        val ext = Uri.parse(url).lastPathSegment?.substringAfterLast('.', "mp3") ?: "mp3"
+                                        val fileName = "$safeName.$ext"
+
+                                        val request = DownloadManager.Request(Uri.parse(url))
+                                            .setTitle(songName)
+                                            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                            .setAllowedOverMetered(true)
+                                            .setAllowedOverRoaming(true)
+                                            .setDestinationInExternalPublicDir(
+                                                Environment.DIRECTORY_DOWNLOADS,
+                                                "JetMelo/Music/$fileName"
+                                            )
+
+                                        val dm = ContextCompat.getSystemService(context, DownloadManager::class.java)
+                                        if (dm == null) {
+                                            Toast.makeText(context, "下载服务不可用", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+
+                                        lastDownloadId = runCatching { dm.enqueue(request) }.getOrNull()
+                                        if (lastDownloadId == null) {
+                                            Toast.makeText(context, "开始下载失败", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "开始下载", Toast.LENGTH_SHORT).show()
+                                            onDismiss()
+                                        }
+                                    }
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Cloud,
+                                contentDescription = null,
+                                Modifier.padding(horizontal = 12.dp)
+                            )
+                            Text(
+                                text = "下载歌曲",
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }

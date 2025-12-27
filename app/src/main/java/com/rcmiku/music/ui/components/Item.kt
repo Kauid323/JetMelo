@@ -1,10 +1,12 @@
 package com.rcmiku.music.ui.components
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkOut
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
@@ -320,8 +322,24 @@ fun PlaylistListItem(
         )
     },
     thumbnailContent = {
+        val context = LocalContext.current
+        val url = playlist.cover
+            .takeIf { it.isNotBlank() }
+            ?.replace("http://", "https://")
         AsyncImage(
-            model = playlist.picUrl,
+            model = ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(true)
+                .listener(
+                    onError = { _, result ->
+                        Log.w(
+                            "PlaylistListItem",
+                            "load cover failed id=${playlist.id} url=$url",
+                            result.throwable
+                        )
+                    }
+                )
+                .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -332,7 +350,6 @@ fun PlaylistListItem(
     trailingContent = trailingContent,
     modifier = modifier
 )
-
 
 @Composable
 fun PlaylistV1ListItem(
@@ -346,8 +363,25 @@ fun PlaylistV1ListItem(
         playlist.trackCount
     ),
     thumbnailContent = {
+        val context = LocalContext.current
+        val url = playlist.coverImgUrl
+            ?.replace("http://", "https://")
+
+            ?.takeIf { it.isNotBlank() }
         AsyncImage(
-            model = playlist.coverImgUrl,
+            model = ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(true)
+                .listener(
+                    onError = { _, result ->
+                        Log.w(
+                            "PlaylistV1ListItem",
+                            "load cover failed id=${playlist.id} url=$url",
+                            result.throwable
+                        )
+                    }
+                )
+                .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier

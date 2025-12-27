@@ -376,8 +376,10 @@ fun Player(
             ArtistBottomSheet(
                 currentSong = it,
                 onClick = { artist ->
-                    navController.navigate(ArtistNav(artistId = artist.id))
-                    onBackPressed()
+                    if (artist.id > 0L) {
+                        navController.navigate(ArtistNav(artistId = artist.id))
+                        onBackPressed()
+                    }
                 }, onDismiss = {
                     openBottomSheet = false
                 },

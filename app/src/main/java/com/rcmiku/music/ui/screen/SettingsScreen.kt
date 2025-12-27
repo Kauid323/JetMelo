@@ -1,5 +1,15 @@
 package com.rcmiku.music.ui.screen
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
@@ -36,10 +46,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import com.rcmiku.music.R
 import com.rcmiku.music.constants.SettingItemCorner
@@ -51,6 +63,7 @@ import com.rcmiku.music.constants.ncmCookieKey
 import com.rcmiku.music.constants.use40DpIconKey
 import com.rcmiku.music.ui.components.Dialog
 import com.rcmiku.music.ui.components.SongQualityDialog
+import com.rcmiku.music.ui.icons.Down
 import com.rcmiku.music.ui.icons.Github
 import com.rcmiku.music.ui.icons.GraphicEq
 import com.rcmiku.music.ui.icons.Login
@@ -69,6 +82,18 @@ import com.rcmiku.ncmapi.api.player.SongLevel
 @Composable
 fun SettingsScreen(navController: NavHostController) {
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+
+    val requestWriteStoragePermission = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            Toast.makeText(
+                context,
+                if (granted) "存储权限已授予" else "存储权限被拒绝",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    )
 
     var use40DpIcon by rememberPreference(use40DpIconKey, false)
     var audioQuality by rememberEnumPreference(audioQualityKey, defaultValue = SongLevel.STANDARD)
@@ -76,6 +101,13 @@ fun SettingsScreen(navController: NavHostController) {
     var autoSkipNextOnError by rememberPreference(autoSkipNextOnErrorKey, false)
     var logout by rememberSaveable { mutableStateOf(false) }
     var ncmCookie by rememberPreference(ncmCookieKey, "")
+
+    val hasAllFilesAccess = remember {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+    }
+    val hasLegacyWriteAccess = remember {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+    }
 
     val baseSettingItems = listOf(
         SettingItemData(
@@ -120,6 +152,39 @@ fun SettingsScreen(navController: NavHostController) {
             },
             onClick = {
                 showDialog = true
+            }
+        ),
+        SettingItemData(
+            title = "存储权限",
+            subtitle = when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> if (hasAllFilesAccess) "已授权（访问全部文件）" else "未授权（访问全部文件）"
+                Build.VERSION.SDK_INT <= Build.VERSION_CODES.P -> if (hasLegacyWriteAccess) "已授权（写入存储）" else "未授权（写入存储）"
+                else -> "无需授权（系统限制）"
+            },
+            imageVector = Down,
+            onClick = {
+                when {
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        runCatching { context.startActivity(intent) }
+                            .onFailure {
+                                runCatching {
+                                    @Suppress("DEPRECATION")
+                                    context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                                }
+                            }
+                    }
+
+                    Build.VERSION.SDK_INT <= Build.VERSION_CODES.P -> {
+                        requestWriteStoragePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    }
+
+                    else -> {
+                        Toast.makeText(context, "该系统版本不支持申请此权限", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         ),
         SettingItemData(

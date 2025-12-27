@@ -30,6 +30,16 @@ data class ArtistNav(val artistId: Long)
 data class AlbumNav(val albumId: Long)
 
 @Serializable
+data class MvPlayerNav(
+    val mvId: Long = 0,
+    val videoUrl: String = "",
+    val sharedKey: String = "",
+    val title: String = "",
+    val author: String = "",
+    val coverUrl: String = ""
+)
+
+@Serializable
 data class RadioNav(val radioId: Long)
 
 @Serializable

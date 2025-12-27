@@ -158,9 +158,11 @@ fun AlbumScreen(
                             overflow = TextOverflow.Ellipsis,
                             maxLines = 2,
                             modifier = Modifier
-                                .clickable(enabled = it.album.artist != null) {
+                                .clickable(enabled = it.album.artist != null && (it.album.artist?.id ?: 0L) > 0L) {
                                     it.album.artist?.let { artist ->
-                                        navController.navigate(ArtistNav(artistId = artist.id))
+                                        if (artist.id > 0L) {
+                                            navController.navigate(ArtistNav(artistId = artist.id))
+                                        }
                                     }
                                 }
                                 .padding(horizontal = 10.dp)

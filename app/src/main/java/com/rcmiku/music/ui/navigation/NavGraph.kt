@@ -23,6 +23,7 @@ import com.rcmiku.music.ui.screen.HomeScreen
 import com.rcmiku.music.ui.screen.LibraryScreen
 import com.rcmiku.music.ui.screen.ListScreen
 import com.rcmiku.music.ui.screen.LoginScreen
+import com.rcmiku.music.ui.screen.MvPlayerScreen
 import com.rcmiku.music.ui.screen.PlaylistScreen
 import com.rcmiku.music.ui.screen.ProgramRadioScreen
 import com.rcmiku.music.ui.screen.RecordScreen
@@ -115,7 +116,18 @@ fun NavGraph(
                 CloudSongScreen(navController = navController)
             }
             composable<ArtistNav> {
-                ArtistScreen(navController = navController)
+                ArtistScreen(
+                    navController = navController,
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedContentScope = this@composable
+                )
+            }
+            composable<MvPlayerNav> {
+                MvPlayerScreen(
+                    navController = navController,
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedContentScope = this@composable
+                )
             }
             composable<RadioNav> {
                 ProgramRadioScreen(
